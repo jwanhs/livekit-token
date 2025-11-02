@@ -1,7 +1,4 @@
 import { RoomConfiguration } from '@livekit/protocol';
-import bodyParser from 'body-parser';
-import dotenv from 'dotenv';
-import express from 'express';
 import { AccessToken } from 'livekit-server-sdk';
 
 type TokenRequest = {
@@ -17,15 +14,12 @@ type TokenRequest = {
   participantName?: string;
 };
 
-// Load environment variables from .env.local file
-dotenv.config({ path: '.env.local' });
-
-// This route handler creates a token for a given room and participant
-async function createToken(request: TokenRequest) {
+// This function creates a token for a given room and participant
+async function createToken(request: TokenRequest, apiKey: string, apiSecret: string) {
   const roomName = request.room_name ?? request.roomName!;
   const participantName = request.participant_name ?? request.participantName!;
 
-  const at = new AccessToken(process.env.LIVEKIT_API_KEY, process.env.LIVEKIT_API_SECRET, {
+  const at = new AccessToken(apiKey, apiSecret, {
     identity: participantName,
     // Token to expire after 10 minutes
     ttl: '10m',
@@ -55,26 +49,43 @@ async function createToken(request: TokenRequest) {
   return at.toJwt();
 }
 
-const app = express();
-app.use(bodyParser.json());
-const port = 3000;
-
-app.post('/createToken', async (req, res) => {
-  const body = req.body ?? {};
-  body.roomName = body.roomName ?? `room-${crypto.randomUUID()}`;
-  body.participantName = body.participantName ?? `user-${crypto.randomUUID()}`;
-
+export default async ({ req, res, log, error }: any) => {
   try {
-    res.send({
-      server_url: process.env.LIVEKIT_URL,
-      participant_token: await createToken(body),
-    });
-  } catch (err) {
-    console.error('Error generating token:', err);
-    res.status(500).send({ message: 'Generating token failed' });
-  }
-});
+    log('Creating LiveKit token...');
 
-app.listen(port, () => {
-  console.log(`Server listening on port ${port}`);
-});
+    // Get environment variables
+    const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY;
+    const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET;
+    const LIVEKIT_URL = process.env.LIVEKIT_URL;
+
+    if (!LIVEKIT_API_KEY || !LIVEKIT_API_SECRET || !LIVEKIT_URL) {
+      error('Missing required environment variables');
+      return res.json({ 
+        error: 'Server configuration error. Please set LIVEKIT_API_KEY, LIVEKIT_API_SECRET, and LIVEKIT_URL.' 
+      }, 500);
+    }
+
+    // Parse request body
+    const body: TokenRequest = req.body ? JSON.parse(req.body) : {};
+    
+    // Set defaults if not provided
+    body.roomName = body.roomName ?? body.room_name ?? `room-${crypto.randomUUID()}`;
+    body.participantName = body.participantName ?? body.participant_name ?? `user-${crypto.randomUUID()}`;
+
+    // Generate token
+    const token = await createToken(body, LIVEKIT_API_KEY, LIVEKIT_API_SECRET);
+
+    log(`Token created for room: ${body.roomName}, participant: ${body.participantName}`);
+
+    return res.json({
+      server_url: LIVEKIT_URL,
+      participant_token: token,
+    });
+  } catch (err: any) {
+    error('Error generating token:', err);
+    return res.json({ 
+      error: 'Generating token failed',
+      message: err.message 
+    }, 500);
+  }
+};
