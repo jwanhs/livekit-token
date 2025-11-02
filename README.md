@@ -1,44 +1,48 @@
-<a href="https://livekit.io/">
-  <img src="./.github/assets/livekit-mark.png" alt="LiveKit logo" width="100" height="100">
-</a>
+# ⚡ Node.js Starter Function
 
-# Node Token Server
+A simple starter function. Edit `src/main.js` to get started and create something awesome! 🚀
 
-<p>
-  <a href="https://cloud.livekit.io/projects/p_/sandbox"><strong>Deploy a sandbox app</strong></a>
-  •
-  <a href="https://docs.livekit.io">LiveKit Docs</a>
-  •
-  <a href="https://livekit.io/cloud">LiveKit Cloud</a>
-  •
-  <a href="https://blog.livekit.io/">Blog</a>
-</p>
+## 🧰 Usage
 
-A basic LiveKit token server using Node + TypeScipt. For details on generating tokens, see our [documentation](https://docs.livekit.io/home/server/generating-tokens).
+### GET /ping
 
-## Dev Setup
+- Returns a "Pong" message.
 
-Clone the repository and install dependencies:
+**Response**
 
-```console
-cd token-server-node
-pnpm install
+Sample `200` Response:
+
+```text
+Pong
 ```
 
-Set up the environment by copying `.env.example` to `.env.local` and filling in the required values:
+### GET, POST, PUT, PATCH, DELETE /
 
-- `LIVEKIT_URL`
-- `LIVEKIT_API_KEY`
-- `LIVEKIT_API_SECRET`
+- Returns a "Learn More" JSON response.
 
-You can also do this automatically using the LiveKit CLI:
+**Response**
 
-```bash
-lk app env
+Sample `200` Response:
+
+```json
+{
+  "motto": "Build like a team of hundreds_",
+  "learn": "https://appwrite.io/docs",
+  "connect": "https://appwrite.io/discord",
+  "getInspired": "https://builtwith.appwrite.io"
+}
 ```
 
-Build and run the server:
+## ⚙️ Configuration
 
-```console
-pnpm build && pnpm start
-```
+| Setting           | Value         |
+| ----------------- | ------------- |
+| Runtime           | Node (18.0)   |
+| Entrypoint        | `src/main.js` |
+| Build Commands    | `npm install` |
+| Permissions       | `any`         |
+| Timeout (Seconds) | 15            |
+
+## 🔒 Environment Variables
+
+No environment variables required.
