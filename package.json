@@ -2,11 +2,12 @@
   "name": "starter-template",
   "version": "1.0.0",
   "description": "",
-  "main": "src/main.js",
+  "main": "dist/main.js",
   "type": "module",
   "scripts": {
     "format": "prettier --write .",
-    "build": "tsc"
+    "build": "tsc",
+    "start": "node dist/main.js"
   },
   "dependencies": {
     "node-appwrite": "^14.1.0",
