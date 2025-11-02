@@ -66,26 +66,34 @@ export default async ({ req, res, log, error }: any) => {
     }
 
     // Parse request body
-    const body: TokenRequest = req.body ? JSON.parse(req.body) : {};
+    const requestBody = req.body ? JSON.parse(req.body) : {};
     
-    // Set defaults if not provided
-    body.roomName = body.roomName ?? body.room_name ?? `room-${crypto.randomUUID()}`;
-    body.participantName = body.participantName ?? body.participant_name ?? `user-${crypto.randomUUID()}`;
+    // Support multiple field name formats for compatibility
+    const room = requestBody.room ?? requestBody.roomName ?? requestBody.room_name ?? `room-${crypto.randomUUID()}`;
+    const identity = requestBody.identity ?? requestBody.participantName ?? requestBody.participant_name ?? `user-${crypto.randomUUID()}`;
+    const metadata = requestBody.metadata;
+
+    // Build token request
+    const tokenRequest: TokenRequest = {
+      roomName: room,
+      participantName: identity,
+      participant_metadata: metadata ? JSON.stringify(metadata) : undefined,
+    };
 
     // Generate token
-    const token = await createToken(body, LIVEKIT_API_KEY, LIVEKIT_API_SECRET);
+    const token = await createToken(tokenRequest, LIVEKIT_API_KEY, LIVEKIT_API_SECRET);
 
-    log(`Token created for room: ${body.roomName}, participant: ${body.participantName}`);
+    log(`Token created for room: ${room}, participant: ${identity}`);
 
     return res.json({
+      token: token,
       server_url: LIVEKIT_URL,
-      participant_token: token,
     });
   } catch (err: any) {
     error('Error generating token:', err);
     return res.json({ 
       error: 'Generating token failed',
-      message: err.message 
+      message: err.message
     }, 500);
   }
 };
