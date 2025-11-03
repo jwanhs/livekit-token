@@ -1,5 +1,5 @@
 import { RoomConfiguration } from '@livekit/protocol';
-import { AccessToken, VideoGrant } from 'livekit-server-sdk';
+import { AccessToken } from 'livekit-server-sdk';
 
 type TokenRequest = {
   room_name?: string;
@@ -40,7 +40,8 @@ async function createToken(request: TokenRequest, apiKey: string, apiSecret: str
   const isHost = role === 'host';
 
   // Baseline grants for everyone: join, subscribe, publish data
-  const grant: VideoGrant = {
+  // livekit-server-sdk v2 no longer exports VideoGrant; pass a plain object instead
+  at.addGrant({
     roomJoin: true,
     room: roomName,
     canSubscribe: true,
@@ -48,9 +49,7 @@ async function createToken(request: TokenRequest, apiKey: string, apiSecret: str
     canUpdateOwnMetadata: true,
     // Enable RTP track publishing only for host role (you can loosen if needed)
     canPublish: !!isHost,
-  };
-
-  at.addGrant(grant);
+  });
 
   if (request.participant_identity) {
     at.identity = request.participant_identity;
