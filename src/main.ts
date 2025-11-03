@@ -1,43 +1,62 @@
 import { RoomConfiguration } from '@livekit/protocol';
-import { AccessToken } from 'livekit-server-sdk';
+import { AccessToken, VideoGrant } from 'livekit-server-sdk';
 
 type TokenRequest = {
   room_name?: string;
   participant_name?: string;
   participant_identity?: string;
-  participant_metadata?: string;
+  participant_metadata?: string; // JSON string
   participant_attributes?: Record<string, string>;
   room_config?: ReturnType<RoomConfiguration['toJson']>;
 
-  // (old fields, here for backwards compatibility)
+  // Back-compat aliases
   roomName?: string;
   participantName?: string;
 };
 
-// This function creates a token for a given room and participant
+function parseRoleFromMetadata(metaStr?: string): 'host' | 'listener' | undefined {
+  if (!metaStr) return undefined;
+  try {
+    const obj = JSON.parse(metaStr);
+    const role = obj?.role;
+    if (role === 'host' || role === 'listener') return role;
+  } catch {
+    // ignore parse errors; treat as no role
+  }
+  return undefined;
+}
+
 async function createToken(request: TokenRequest, apiKey: string, apiSecret: string) {
   const roomName = request.room_name ?? request.roomName!;
   const participantName = request.participant_name ?? request.participantName!;
 
   const at = new AccessToken(apiKey, apiSecret, {
     identity: participantName,
-    // Token to expire after 10 minutes
     ttl: '10m',
   });
 
-  // Token permissions can be added here based on the
-  // desired capabilities of the participant
-  at.addGrant({
+  // Role-aware grant: default to listener if not specified
+  const role = parseRoleFromMetadata(request.participant_metadata);
+  const isHost = role === 'host';
+
+  // Baseline grants for everyone: join, subscribe, publish data
+  const grant: VideoGrant = {
     roomJoin: true,
     room: roomName,
+    canSubscribe: true,
+    canPublishData: true,
     canUpdateOwnMetadata: true,
-  });
+    // Enable RTP track publishing only for host role (you can loosen if needed)
+    canPublish: !!isHost,
+  };
+
+  at.addGrant(grant);
 
   if (request.participant_identity) {
     at.identity = request.participant_identity;
   }
   if (request.participant_metadata) {
-    at.metadata = request.participant_metadata;
+    at.metadata = request.participant_metadata; // keep JSON string as metadata
   }
   if (request.participant_attributes) {
     at.attributes = request.participant_attributes;
@@ -48,7 +67,6 @@ async function createToken(request: TokenRequest, apiKey: string, apiSecret: str
 
   return at.toJwt();
 }
-
 export default async ({ req, res, log, error }: any) => {
   try {
     log('Creating LiveKit token...');
@@ -60,40 +78,57 @@ export default async ({ req, res, log, error }: any) => {
 
     if (!LIVEKIT_API_KEY || !LIVEKIT_API_SECRET || !LIVEKIT_URL) {
       error('Missing required environment variables');
-      return res.json({ 
-        error: 'Server configuration error. Please set LIVEKIT_API_KEY, LIVEKIT_API_SECRET, and LIVEKIT_URL.' 
-      }, 500);
+      return res.json(
+        {
+          error:
+            'Server configuration error. Please set LIVEKIT_API_KEY, LIVEKIT_API_SECRET, and LIVEKIT_URL.',
+        },
+        500
+      );
     }
 
-    // Parse request body
     const requestBody = req.body ? JSON.parse(req.body) : {};
-    
-    // Support multiple field name formats for compatibility
-    const room = requestBody.room ?? requestBody.roomName ?? requestBody.room_name ?? `room-${crypto.randomUUID()}`;
-    const identity = requestBody.identity ?? requestBody.participantName ?? requestBody.participant_name ?? `user-${crypto.randomUUID()}`;
+
+    // Support multiple field names for compatibility with different clients
+    const room =
+      requestBody.room ??
+      requestBody.roomName ??
+      requestBody.room_name ??
+      `room-${crypto.randomUUID()}`;
+
+    const identity =
+      requestBody.identity ??
+      requestBody.participantName ??
+      requestBody.participant_name ??
+      `user-${crypto.randomUUID()}`;
+
+    // Expecting something like { role: 'host' | 'listener', ... }
+    // We’ll stringify so it’s set into the token metadata
     const metadata = requestBody.metadata;
 
-    // Build token request
     const tokenRequest: TokenRequest = {
       roomName: room,
       participantName: identity,
       participant_metadata: metadata ? JSON.stringify(metadata) : undefined,
+      // You may also forward participant_identity/attributes/room_config if you need them
     };
 
-    // Generate token
     const token = await createToken(tokenRequest, LIVEKIT_API_KEY, LIVEKIT_API_SECRET);
 
     log(`Token created for room: ${room}, participant: ${identity}`);
 
     return res.json({
-      token: token,
+      token,
       server_url: LIVEKIT_URL,
     });
   } catch (err: any) {
     error('Error generating token:', err);
-    return res.json({ 
-      error: 'Generating token failed',
-      message: err.message
-    }, 500);
+    return res.json(
+      {
+        error: 'Generating token failed',
+        message: err?.message ?? 'Unknown error',
+      },
+      500
+    );
   }
 };
