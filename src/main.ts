@@ -70,17 +70,17 @@ export default async ({ req, res, log, error }: any) => {
   try {
     log('Creating LiveKit token...');
 
-    // Get environment variables
-    const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY;
-    const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET;
-    const LIVEKIT_URL = process.env.LIVEKIT_URL;
+    // Get environment variables, Appwrite already has global system variables with the default names?
+    const LIVEKIT_API_KEY = process.env.LIVE_KEY;
+    const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SEC;
+    const LIVEKIT_URL = process.env.LIVE_URL;
 
     if (!LIVEKIT_API_KEY || !LIVEKIT_API_SECRET || !LIVEKIT_URL) {
       error('Missing required environment variables');
       return res.json(
         {
           error:
-            'Server configuration error. Please set LIVEKIT_API_KEY, LIVEKIT_API_SECRET, and LIVEKIT_URL.',
+            'Server configuration error. Please set LIVE_KEY, LIVEKIT_API_SEC, and LIVE_URL.',
         },
         500
       );
